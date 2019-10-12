@@ -3,3 +3,4 @@ MoonForum/settings.py
 inc/*
 toos/*
 __pycache__
+*/test.py
