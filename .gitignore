@@ -1,0 +1,6 @@
+MoonForum/settings.py
+\.idea/*
+inc/*
+toos/*
+__pycache__
+*test.py
