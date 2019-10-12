@@ -1,3 +1,4 @@
-settings.py
+MoonForum/settings.py
 \.idea/*
 inc/*
+toos/*
