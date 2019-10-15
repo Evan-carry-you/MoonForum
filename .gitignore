@@ -4,3 +4,7 @@ inc/*
 toos/*
 __pycache__
 *test.py
+*my_test.py
+*.conf
+*.log
+log/*
