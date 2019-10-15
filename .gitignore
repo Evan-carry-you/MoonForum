@@ -1,7 +1,7 @@
 MoonForum/settings.py
 \.idea/*
 inc/*
-toos/*
+tools/*
 __pycache__
 *test.py
 *my_test.py
