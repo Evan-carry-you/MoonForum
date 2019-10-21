@@ -1,14 +1,52 @@
 import json
-import logging
 from random import choice
+from datetime import datetime
 
 from tornado.web import RequestHandler
-from apps.users.forms import SMSCodeForm, RegisterForm
+from apps.users.forms import SMSCodeForm, RegisterForm, LoginForm
 from apps.users.models import User
+import jwt
 
 from MoonForum.settings import SMS_SETTING
 from MoonForum.handler import RedisHandler
 from apps.utils.AsyncSMS import JUHESMS
+
+class LoginHandler(RedisHandler):
+	async def post(self, *args, **kwargs):
+		re_data = {}
+
+		param = self.request.body.decode("utf8")
+		param = json.loads(param)
+		login_form = LoginForm.from_json(param)
+
+		if login_form.validate():
+			mobile = login_form.mobile.data
+			password = login_form.password.data
+
+			try:
+				user = await self.application.objects.get(User, mobile=mobile)
+				if not user.password.check_password(password):
+					self.set_status(400)
+					re_data['mobile'] = "用户名或密码错误"
+				else:
+					play_load = {
+						"id":user.id,
+						"nick_name":user.nick_name,
+						"exp":datetime.utcnow()
+					}
+					token = jwt.encode(play_load, self.settings['jwt']['secret_key'], algorithm="HS256")
+					re_data['id'] = user.id
+					if user.nick_name is None:
+						re_data['nick_name'] = user.mobile
+					else:
+						re_data['nick_name'] = user.nick_name
+					re_data['token'] = token.decode("utf8")
+			except User.DoesNotExist as e:
+				self.set_status(400)
+				re_data['mobile'] = "用户名不存在"
+		else:
+			pass
+		self.finish(re_data)
 
 class RegisterHandler(RedisHandler):
 	async def post(self, *args, **kwargs):
@@ -28,6 +66,7 @@ class RegisterHandler(RedisHandler):
 			else:
 				try:
 					exist_user = await self.application.objects.get(User, mobile=mobile)
+					self.set_status(400)
 					re_data['mobile'] = "用户已存在"
 				except User.DoesNotExist as e:
 					user = await self.application.objects.create(User, mobile=mobile, password=password)
