@@ -5,3 +5,4 @@ pymysql
 aiomysql
 pyJWT
 aiofiles
+pillow

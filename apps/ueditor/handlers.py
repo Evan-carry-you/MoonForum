@@ -166,7 +166,7 @@ class UeditorEnv():
 
 u4Ts = UeditorEnv(with_list_cache=True)
 
-from MxForm.handler import BaseHandler
+from MoonForum.handler import BaseHandler
 class UploadHandler(BaseHandler):
     executor = futures.ThreadPoolExecutor(100)
 

@@ -3,7 +3,7 @@
 from .handlers import *
 from tornado.web import url
 
-urlpattern = (
+url_pattern = (
     (r'/upload/', UploadHandler),
     (r'/ueditor', UeditorHandler),
     (r'/upload/(.*)', StaticFileHandler, {'path': 'upload'}),
