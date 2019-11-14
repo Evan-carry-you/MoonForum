@@ -10,6 +10,8 @@ from apps.question.forms import QuestionForm, AnswerForm, ReplyForm
 from apps.question.models import Question, Answer
 from apps.utils.moon_decorators import authenticated_async
 from apps.utils.util_funcs import json_serial
+from apps.message.models import Message
+from apps.users.models import User
 
 
 class QuestionHandler(RedisHandler):
@@ -137,6 +139,9 @@ class AnswerHandler(RedisHandler):
 				                                               question=question, reply_user=question.user)
 				count += 1
 				re_data['id'] = answer.id
+				receiver = await self.application.objects.get(User, id=question.user)
+				await self.application.objects.create(Message, sender=self.current_user, receiver=receiver, message_type=4,
+																							message=answer_form.content.data, parent_content=question.title)
 			if count == 0:
 				self.set_status(404)
 		else:
@@ -159,12 +164,18 @@ class ReplyHandler(RedisHandler):
 			answer = await self.application.objects.execute(Answer.extend().where(Answer.id == int(answer_id)))
 			count = 0
 			for item in answer:
-				reply = await self.application.objects.create(Answer, user=self.current_user, content=reply_form.content.data,
-				                                              reply_user=reply_form.replyed_user.data, parent_answer=item)
-				count += 1
-				item.reply_nums += 1
-				await self.application.objects.update(item)
-				re_data['id'] = reply.id
+				try:
+					reply_user = await self.application.objects.get(User, id=int(reply_form.replyed_user.data))
+					reply = await self.application.objects.create(Answer, user=self.current_user, content=reply_form.content.data,
+																												reply_user=reply_user, parent_answer=item)
+					count += 1
+					item.reply_nums += 1
+					await self.application.objects.update(item)
+					re_data['id'] = reply.id
+					await self.application.objects.create(Message, sender=self.current_user, receiver=reply_user, message_type=5,
+																								message=reply_form.content.data, parent_content=item.content)
+				except User.DoesNotExist as e:
+					self.set_status(400)
 			if count == 0:
 				self.set_status(400)
 		else:

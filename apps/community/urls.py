@@ -1,6 +1,6 @@
 from tornado.web import url
 
-from apps.community.handler import GroupHandler, GroupMemberHandler, GroupDetailHandler, PostHandler, PostDetailHandler, PostCommentHandler, CommentReplyHandler, CommentLikeHandler
+from apps.community.handler import *
 
 
 url_pattern = [
@@ -11,5 +11,7 @@ url_pattern = [
 	url("/posts/([0-9]*)/", PostDetailHandler),
 	url("/posts/([0-9]*)/comments/", PostCommentHandler),
 	url("/comments/([0-9]*)/replys/", CommentReplyHandler),
-	url("/comments/([0-9]*)/likes/", CommentLikeHandler)
+	url("/comments/([0-9]*)/likes/", CommentLikeHandler),
+	url("/applys/", ApplyHandler),
+	url("/members/([0-9]*)/", HandleApplyHandler)
 ]

@@ -11,6 +11,7 @@ from apps.utils.moon_decorators import authenticated_async
 from apps.community.models import CommunityGroup, CommunityGroupMember, Post, PostComment, CommentsLike
 from apps.community.forms import *
 from apps.utils.util_funcs import json_serial
+from apps.message.models import Message
 
 
 class GroupHandler(RedisHandler):
@@ -102,6 +103,9 @@ class GroupMemberHandler(RedisHandler):
 				                                                         user=self.current_user,
 				                                                         apply_reason=community_apply_form.apply_reason.data)
 				re_data['id'] = community_member.id
+		# 申请通知
+		# await self.application.objects.create(Message, sender=self.current_user, receiver=receiver, message_type=4,
+		# 																			message="", parent_content=comment.content)
 		else:
 			self.set_status(400)
 			for field in community_apply_form.erros:
@@ -266,12 +270,16 @@ class PostCommentHandler(RedisHandler):
 				post = await self.application.objects.get(Post, id=int(post_id))
 				comment = await self.application.objects.create(PostComment, user=self.current_user,
 				                                                post=post, content=comment_form.content.data)
-				post.comment_nums += 1
-				await self.application.objects.update(post)
 				re_data['id'] = comment.id
 				re_data['user'] = {}
 				re_data['user']['id'] = self.current_user.id
 				re_data['user']['nick_name'] = self.current_user.nick_name
+				# 写入回复通知
+				receiver = await self.application.objects.get(User, id=post.user_id)
+				await self.application.objects.create(Message, sender=self.current_user, receiver=receiver, message_type=1,
+				                                      message=comment_form.content.data, parent_content=post.title)
+				post.comment_nums += 1
+				await self.application.objects.update(post)
 			except Post.DoesNotExist as e:
 				self.set_status(404)
 		else:
@@ -318,6 +326,10 @@ class CommentReplyHandler(RedisHandler):
 				comment.replied_nums += 1
 				await self.application.objects.update(comment)
 				re_data['id'] = reply.id
+				# 写入回复通知
+				await self.application.objects.create(Message, sender=self.current_user, receiver=replied_user, message_type=2,
+				                                      message=reply_form.content.data, parent_content=comment.content)
+
 			except PostComment.DoesNotExist as e:
 				self.set_status(404)
 			except User.DoesNotExist as e:
@@ -347,6 +359,70 @@ class CommentLikeHandler(RedisHandler):
 			# 之前没有被点赞过，加入点赞
 			comment_like = await self.application.objects.create(CommentsLike, post_comment=comment, user=user)
 			re_data['id'] = comment_like.id
+			# 写入点赞通知
+			receiver = await self.application.objects.get(User, id=comment.user_id)
+			await self.application.objects.create(Message, sender=self.current_user, receiver=receiver, message_type=3,
+			                                      message="", parent_content=comment.content)
 			comment.like_nums += 1
 			await self.application.objects.update(comment)
+		self.finish(re_data)
+
+
+class ApplyHandler(RedisHandler):
+	@authenticated_async
+	async def get(self, *args, **kwargs):
+		re_data = []
+		all_groups = await self.application.objects.execute(
+			CommunityGroup.extend().where(CommunityGroup.add_user == self.current_user))
+		all_group_ids = [group.id for group in all_groups]
+		group_member_query = CommunityGroupMember.extend().where(CommunityGroupMember.community_id.in_(all_group_ids),
+		                                                         CommunityGroupMember.status.is_null(True))
+		group_members = await self.application.objects.execute(group_member_query)
+		for member in group_members:
+			re_data.append({
+				"id":           member.id,
+				"user":         {
+					"id":        member.user.id,
+					"nick_name": member.user.nick_name
+				},
+				"group":        member.community.name,
+				"apply_reason": member.apply_reason,
+				"add_time":     member.add_time.strftime("%Y-%m-%m")
+			})
+		self.finish(json.dumps(re_data))
+
+
+class HandleApplyHandler(RedisHandler):
+	@authenticated_async
+	async def patch(self, apply_id, *args, **kwargs):
+		re_data = {}
+
+		param = self.request.body.decode("utf8")
+		param = json.loads(param)
+		form = HandleApplyForm.from_json(param)
+
+		if form.validate():
+			all_group = await self.application.objects.execute(
+				CommunityGroup.extend().where(CommunityGroup.add_user == self.current_user))
+			apply = await self.application.objects.execute(
+				CommunityGroupMember.extend().where(CommunityGroupMember.id == apply_id,
+				                                    CommunityGroupMember.status.is_null(True)))
+			group_ids = [group.id for group in all_group]
+			count = 0
+			for app in apply:
+				if app.community.id in group_ids:
+					# 修改处理结果，并更新最终信息
+					app.status = form.status.data
+					app.handle_msg = form.handle_msg.data
+					await self.application.objects.update(app)
+					re_data['success'] = 1
+					count += 1
+				else:
+					self.set_status(403)
+			if count == 0:
+				self.set_status(400)
+		else:
+			for field in form.errors:
+				re_data[field] = form.errors[field][0]
+
 		self.finish(re_data)

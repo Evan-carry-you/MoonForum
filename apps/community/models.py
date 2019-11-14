@@ -32,10 +32,10 @@ class CommunityGroupMember(BaseModel):
 	handle_msg = CharField(max_length=200, null=True, verbose_name="处理内容")
 	apply_reason = CharField(max_length=200, verbose_name="申请原因")
 	handle_time = DateField(default=datetime.now(), verbose_name="处理时间")
-	#
-	# @classmethod
-	# def extend(cls):
-	# 	return cls().select(cls, User.id, User.nick_name).join(User, JOIN.LEFT_OUTER, on=(CommunityGroupMember.user==User.id)).switch(cls).join(CommunityGroup, JOIN.LEFT_OUTER, on=(CommunityGroupMember.community==CommunityGroup.id)).join()
+
+	@classmethod
+	def extend(cls):
+		return cls().select(cls, User.id, User.nick_name, User.head , CommunityGroup).join(User).switch(cls).join(CommunityGroup)
 
 class Post(BaseModel):
 	user = ForeignKeyField(User, verbose_name="作者")

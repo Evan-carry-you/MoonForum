@@ -22,3 +22,7 @@ class CommentReplyForm(Form):
 	replyed_user = IntegerField("回复用户", validators=[DataRequired("请输入回复用户")])
 	content = StringField("回复", validators=[DataRequired(message="请输入回复内容"), length(min=5, message="不能少于5个字符")])
 
+class HandleApplyForm(Form):
+	status = StringField("审核状态", validators=[DataRequired(message="请传入审核状态"), AnyOf(values=["agree", "refuse"])])
+	handle_msg = StringField("处理原因")
+
